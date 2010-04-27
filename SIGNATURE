@@ -1,0 +1,37 @@
+This file contains message digests of all files listed in MANIFEST,
+signed via the Module::Signature module, version 0.63.
+
+To verify the content in this distribution, first make sure you have
+Module::Signature installed, then type:
+
+    % cpansign -v
+
+It will check each file's integrity, as well as the signature's
+validity.  If "==> Signature verified OK! <==" is not displayed,
+the distribution may already have been compromised, and you should
+not run its Makefile.PL or Build.PL.
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+SHA1 f9a36d0ba9cc6cb6264998833c1fea0ceca49308 Build.PL
+SHA1 ecba0577847c989d4583604aa27d89f2e3405fb7 Changes
+SHA1 d3a82c1ffe42f287411fdafd684b48cfb17b5e24 INSTALL
+SHA1 3ec282794cf2b659d09b1add399fb56b03752b34 LICENSE
+SHA1 2ba2b8edfb23efeca9a52ebc6fc67ad07dcc9cdd MANIFEST
+SHA1 717c9a493de49310ba1ac699351e7abdce7b091e META.yml
+SHA1 d9cc05327faa8b30b2c09910791b2a2d28f4c450 Makefile.PL
+SHA1 71ce30c10610d3c94160a6a378dfa75a00c210a4 README
+SHA1 baa008aadfe9717642e177878172f468f10517c5 lib/WWW/Wordnik/API.pm
+SHA1 2de3cbb21da1c539a443572e3ea906d865da9d6e t/00.load.t
+SHA1 801db20e7818f22fcfa152b1023e097941c665ca t/10.object-creation.t
+SHA1 44a94133d324bc20f0857e727b77f92c0b75c15c t/20.selectors.t
+SHA1 34926afe21440fac4e5bc5410f34a2a594ce0729 t/30.methods.t
+SHA1 0190346d7072d458c8a10a45c19f86db641dcc48 t/pod.t
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.10 (GNU/Linux)
+
+iEYEAREIAAYFAkvWlRYACgkQvUI03qKHSRqinwCfTjxKdGB8Gj3hrDBsQTdW/b/r
+E8cAnjsoGQH2kmlH7Ws12MQ0/BXE9yRw
+=B6We
+-----END PGP SIGNATURE-----
