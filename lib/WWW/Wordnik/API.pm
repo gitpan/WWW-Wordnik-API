@@ -6,8 +6,7 @@ use Carp;
 
 use LWP::UserAgent;
 
-use version; our $VERSION = qv('0.0.1');
-our $AUTOLOAD;
+use version; our $VERSION = qv('0.0.2');
 
 use constant {
     API_VERSION  => 3,
@@ -21,16 +20,15 @@ use constant {
 };
 
 my $fields = {
-    server_uri => API_BASE_URL . q{/api-v} . API_VERSION,
-    api_key    => API_KEY,
-    version    => API_VERSION,
-    format     => API_FORMAT,
-    cache      => CACHE,
-    debug      => DEBUG,
-    _formats   => { json => 1, xml => 1, perl => 1 },
-    _versions  => { 1 => 0, 2 => 0, 3 => 1 },
-    _cache =>
-        { count => 0, max => CACHE, last_request => undef, requests => {} },
+    server_uri  => API_BASE_URL . q{/api-v} . API_VERSION,
+    api_key     => API_KEY,
+    version     => API_VERSION,
+    format      => API_FORMAT,
+    cache       => CACHE,
+    debug       => DEBUG,
+    _formats    => { json => 1, xml => 1, perl => 1 },
+    _versions   => { 1 => 0, 2 => 0, 3 => 1 },
+    _cache      => { max => CACHE, requests => {}, data => [] },
     _user_agent => LWP::UserAgent->new(
         agent           => 'Perl-' . MODULE_NAME . q{/} . $VERSION,
         default_headers => HTTP::Headers->new( ':api_key' => API_KEY ),
@@ -114,7 +112,7 @@ sub cache {
     my ( $self, $cache ) = @_;
 
     if ( defined $cache and $cache =~ m/\d+/ ) {
-        return $self->{cache} = $cache;
+        return $self->{cache} = $fields->{_cache}->{max} = $cache;
     }
     else {
         return $self->{cache};
@@ -247,7 +245,7 @@ sub related {
 
     my $query = "$word/related";
 
-    if (exists $args{type}) {
+    if ( exists $args{type} ) {
         if ( 'ARRAY' eq ref $args{type} ) {
             for my $type ( @{ $args{type} } ) {
 
@@ -329,6 +327,8 @@ sub randomWord {
     return $self->_send_request( $self->_build_request( 'words', $query ) );
 }
 
+### internal methods
+
 sub _build_request {
     my ( $self, $namespace, $query ) = @_;
 
@@ -344,15 +344,60 @@ sub _send_request {
 
     return $request if $self->{debug};
 
+    # cache
     if ( $self->cache and exists $self->{_cache}->{requests}->{$request} ) {
-        return $self->{_cache}->{requests}->{$request};
+        return ${ $self->{_cache}->{requests}->{$request} };
     }
+
+    # request
     else {
-        my $data = $self->{_user_agent}->get($request)->content;
-        $data = from_json($data) if 'perl' eq $self->format;
+        my $response = $self->{_user_agent}->get($request);
+
+        my $data = $self->_validate_response($response);
+
+        $data = from_json($data)
+            if 'perl' eq $self->format;
 
         return $self->_cache_data( $request, $data );
     }
+}
+
+sub _validate_response {
+    my ( $self, $response ) = @_;
+
+    return $response->decoded_content
+        if $response->is_success
+            or $response->is_redirect;
+
+    croak $response->as_string
+        if ( $response->is_error
+        or $response->is_info );
+}
+
+sub _pop_cache {
+    my ($self) = @_;
+    my $c = $self->{_cache};
+
+    return unless 'ARRAY' eq ref $c->{data};
+    my $oldest = pop @{ $c->{data} };
+
+    return unless 'ARRAY' eq ref $oldest;
+    my ( $request, $data ) = @{$oldest};
+
+    delete $c->{requests}->{$request};
+    return $data;
+}
+
+sub _load_cache {
+    my ( $self, $request, $data ) = @_;
+
+    my $c = $self->{_cache};
+
+    $c->{requests}->{$request} = \$data;
+
+    unshift @{ $c->{data} }, [ $request, $data ];
+
+    return $data;
 }
 
 sub _cache_data {
@@ -360,15 +405,10 @@ sub _cache_data {
 
     my $c = $self->{_cache};
 
-    if ( $c->{count} and $c->{count} >= $c->{max} ) {
-        delete $c->{requests}->{ $c->{last_request} };
-        $c->{count}--;
-    }
+    $c->_pop_cache
+        if @{ $c->{data} } >= $c->{max};
 
-    $c->{last_request} = $request;
-    $c->{count}++;
-
-    return $c->{requests}->{$request} = $data;
+    return $self->_load_cache( $request, $data );
 }
 
 sub _json_available {
@@ -387,7 +427,9 @@ WWW::Wordnik::API - Wordnik API implementation
 
 =head1 VERSION
 
-This document describes WWW::Wordnik::API version 0.0.1
+This document describes WWW::Wordnik::API version 0.0.2.
+
+The latest development revision is available at L<git://github.com/pedros/WWW-Wordnik-API.git>.
 
 
 =head1 SYNOPSIS
@@ -440,9 +482,10 @@ This module implements version 3 of the Wordnik API (L<http://docs.wordnik.com/a
 It provides a simple object-oriented interface with methods named after the REST ones provided by Wordnik.
 You should therefore be able to follow their documentation only and still work with this module.
 
-At this point, all this module does is build request URIs and ship them out as GET methods to LWP::UserAgent.
-Response headers are not checked for 404s, etc. Likewise, response data is not post-processed in any way, other
-than optionally being parsed from C<JSON> to C<Perl> data structures. Data::Dumper should be of help there.
+At this point, this module builds request URIs and ship them out as GET methods to LWP::UserAgent.
+Response headers are checked for error codes (specifically, throw exception on headers anything other than 2/3xx).
+Response data is not post-processed in any way, other than optionally being parsed from C<JSON> to C<Perl> data structures.
+Data::Dumper should be of help there.
 
 
 =head1 INTERFACE 
@@ -507,7 +550,7 @@ Default C<$format>: I<json>. Other accepted formats are I<xml> and I<perl>.
 
 =item cache($cache)
 
-Default C<$cache>: I<10>. Number of requests to cache. Deletes the latest one if cache fills up.
+Default C<$cache>: I<10>. Number of requests to cache. Deletes the oldest request if cache fills up.
 
 
 =item debug()
@@ -540,8 +583,8 @@ If the suggester is enabled, you can tell it to return the best match with C<use
 =item phrases($word, %args)
 
 You can fetch interesting bi-gram phrases containing a word.
-The “mi” and “wlmi” elements refer to “mutual information” 
-and “weighted mutual information” and will be explained in detail via future blog post.
+The "mi" and "wlmi" elements refer to "mutual information" 
+and "weighted mutual information" and will be explained in detail via future blog post.
 See L<http://docs.wordnik.com/api/methods#phrases>.
 
 C<$word> is the word to look up. C<%args> accepts:
@@ -551,7 +594,7 @@ Default C<count>: I<5>. Specify the number of results returned.
 
 =item definitions($word, %args)
 
-Definitions for words are available from Wordnik’s keying of the Century Dictionary and parse of the Webster GCIDE.
+Definitions for words are available from Wordnik's keying of the Century Dictionary and parse of the Webster GCIDE.
 The Dictionary Model XSD is available in L<http://github.com/wordnik/api-examples/blob/master/docs/dictionary.xsd> in GitHub.
 See L<http://docs.wordnik.com/api/methods#definitions>.
 
@@ -568,7 +611,7 @@ The available partOfSpeech values are:
 
 =item examples($word)
 
-You can retrieve 5 example sentences for a words in Wordnik’s alpha corpus. Each example contains the source document and a source URL, if it exists.
+You can retrieve 5 example sentences for a words in Wordnik's alpha corpus. Each example contains the source document and a source URL, if it exists.
 See L<http://docs.wordnik.com/api/methods#examples>.
 
 C<$word> is the word to look up.
@@ -590,7 +633,7 @@ The available type values are:
 
 =item frequency($word)
 
-You can see how common particular words occur in Wordnik’s alpha corpus, ordered by year.
+You can see how common particular words occur in Wordnik's alpha corpus, ordered by year.
 See L<http://docs.wordnik.com/api/methods#freq>.
 
 C<$word> is the word to look up.
@@ -619,7 +662,7 @@ Default C<startAt>: I<0>. You can also specify the starting index for the result
 
 =item wordoftheday
 
-You can fetch Wordnik’s word-of-the day which contains definitions and example sentences.
+You can fetch Wordnik's word-of-the day which contains definitions and example sentences.
 See L<http://docs.wordnik.com/api/methods#wotd>.
 
 
@@ -707,8 +750,8 @@ None reported.
 
 No bugs have been reported.
 
-Response headers are not checked for 404s, etc. Likewise, response data is not post-processed in any way, other
-than optionally being parsed from C<JSON> to C<Perl> data structures. Data::Dumper should be of help there.
+Response data is not post-processed in any way, other than optionally being parsed from C<JSON> to C<Perl> data structures.
+Data::Dumper should be of help there.
 
 Please report any bugs or feature requests to
 C<bug-www-wordnik-api@rt.cpan.org>, or through the web interface at
@@ -719,13 +762,11 @@ L<http://rt.cpan.org>.
 
 =over
 
-=item Error checking
-
-Implement basic HTTP error checking on response headers.
-
 =item Post-processing
 
 Add filtering methods on response data.
+
+=item Implement WWW::Wordnik::API::Response class to handle the above
 
 =back
 
