@@ -2,7 +2,7 @@ NAME
     WWW::Wordnik::API - Wordnik API implementation
 
 VERSION
-    This document describes WWW::Wordnik::API version 0.0.3.
+    This document describes WWW::Wordnik::API version 0.0.5.
 
     The latest development revision is available at
     <git://github.com/pedros/WWW-Wordnik-API.git>.
@@ -35,7 +35,7 @@ SYNOPSIS
         $p->examples('Java');
 
         $p->related('Lisp');
-        $p->related('Lisp', type => [qw/synonym antonym form equivalent hyponym variant/]);
+        $p->related('Lisp', type => [qw/synonym antonym form hyponym variant verb-stem verb-form cross-reference same-context/]);
 
         $p->frequency('Scheme');
 
@@ -50,11 +50,11 @@ SYNOPSIS
         $p->randomWord(hasDictionaryDef => 'true');
 
 DESCRIPTION
-    This module implements version 3 of the Wordnik API
-    (<http://docs.wordnik.com/api>). It provides a simple object-oriented
-    interface with methods named after the REST ones provided by Wordnik.
-    You should therefore be able to follow their documentation only and
-    still work with this module.
+    This module implements version 4.0 of the Wordnik API
+    (<http://developer.wordnik.com/api>). It provides a simple
+    object-oriented interface with methods named after the REST ones
+    provided by Wordnik. You should therefore be able to follow their
+    documentation only and still work with this module.
 
     At this point, this module builds request URIs and ship them out as GET
     methods to LWP::UserAgent. Response headers are checked for error codes
@@ -67,9 +67,9 @@ INTERFACE
   CLASS METHODS
     new(%args)
             my %args = (
-                server_uri => 'http://api.wordnik.com/api-v3',
+                server_uri => 'http://api.wordnik.com/v4',
                 api_key    => 'your key',
-                version    => '3',
+                version    => '4',
                 format     => 'json', # json | xml | perl
             );
 
@@ -79,11 +79,11 @@ INTERFACE
     All selector methods can be assigned to, or retrieved from, as follows:
 
         $WN->method($value) # assign
-        $WN->method        # retrieve
+        $WN->method         # retrieve
 
     server_uri()
     server_uri($uri)
-        Default $uri: <http://api.wordnik.com/api-v3>
+        Default $uri: <http://api.wordnik.com/v4>
 
     api_key()
     api_key($key)
@@ -92,8 +92,8 @@ INTERFACE
 
     version()
     version($version)
-        Default $version: *3*. Only API version 3 (the latest) is currently
-        supported.
+        Default $version: *4*. This module supports API version 3 and 4
+        (default).
 
     format()
     format($format)
@@ -173,7 +173,7 @@ INTERFACE
 
         The available type values are:
 
-            [synonym, antonym, form, equivalent, hyponym, variant]
+            [synonym, antonym, form, hyponym, variant, verb-stem, verb-form, cross-reference, same-context]
 
     frequency($word)
         You can see how common particular words occur in Wordnik's alpha
@@ -210,7 +210,7 @@ INTERFACE
 
     randomWord(%args)
         You can fetch a random word from the Alpha Corpus. See
-        <http://docs.wordnik.com/api/methods#random>.
+        <http://http://developer.wordnik.com/docs>.
 
         %args accepts:
 
